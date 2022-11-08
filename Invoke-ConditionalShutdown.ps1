@@ -304,7 +304,7 @@ if ($shutdown)
 		}
 		catch
 		{
-			$result = "Error caught by handler: $_"
+			$result = "Error caught by handler:`n$_"
 			logme $result $true
 		}
 	}
