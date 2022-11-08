@@ -199,7 +199,7 @@ logme ''
 logme 'Launched'
 
 
-if ($GetArsoKey.IsPresent -or (!($null -eq $SetArsoKey)))
+if ($GetArsoKey.IsPresent -or $PSBoundParameters.ContainsKey("SetArsoKey"))
 {
 	if ($GetArsoKey.IsPresent)
 	{
