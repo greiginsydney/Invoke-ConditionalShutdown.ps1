@@ -52,11 +52,11 @@
 	(It's basically "exe name", "title bar text", but with RegEx to complicate matters).
 
 .EXAMPLE
-	.\Invoke-ConditionalShutdown.ps1 -SetArsoKey 0
+	.\Invoke-ConditionalShutdown.ps1 -SetArsoKey
 
 	Description
 	-----------
-	Sets the ARSO registry key to 0, enabling the -reopen attribute to operate as expected. See the reference link at the bottom of this file.
+	Sets the ARSO registry key, enabling the -reopen attribute to operate as expected. See the reference link at the bottom of this file.
 
 .EXAMPLE
 	.\Invoke-ConditionalShutdown.ps1 -SkipFile "ShutdownSkipFile.csv" -TestMode
@@ -73,6 +73,9 @@
 .PARAMETER SkipFile
 	File name (and path if you wish) of a file containing "skip conditions".
 
+.PARAMETER ValidateSkipFile
+	Switch. If present, the script will test the validity of the Regular Expressions in the SkipFile
+
 .PARAMETER Hibernate
 	Switch. If present, the script will hibernate the machine instead of shutting it down.
 	
@@ -83,7 +86,7 @@
 	Switch. Queries the current state of the ARSO registry key.
 	
 .PARAMETER SetArsoKey
-	Switch. Sets the ARSO registry key to 0, required for "-reopen" to operate correctly.
+	Switch. Sets the ARSO registry key to 0 or 1. A value of 0 is required for "-reopen" to operate correctly.
 	
 .PARAMETER TestMode
 	Switch. If present, the script will NOT shutdown or hibernate the machine. It's essentially a "whatif".
@@ -105,6 +108,8 @@ param(
 	[string]$SkipList,
 	[Parameter(ParameterSetName='Default', Mandatory = $false)]
 	[alias('File')][string]$SkipFile,
+	[Parameter(ParameterSetName='Default', Mandatory = $false)]
+	[switch]$ValidateSkipFile,
 	[Parameter(ParameterSetName='Default', Mandatory = $false)]
 	[alias('h')][switch]$Hibernate,
 	[Parameter(ParameterSetName='Default', Mandatory = $false)]
@@ -171,9 +176,118 @@ function WriteRegistry
 	}
 }
 
+
+function ValidateSkipFile
+{
+	param ([string]$Filename)
+
+	$SkipFileEntries = $null
+
+	#If the user only provided a filename, add the script's path for an absolute reference:
+	if ([IO.Path]::IsPathRooted($Filename))
+	{
+		#It's absolute. Safe to leave.
+	}
+	else
+	{
+		#It's relative.
+		$Filename = [IO.Path]::GetFullPath((Join-Path -path $dir -childpath $Filename))
+	}
+
+	if (test-path $Filename)
+	{
+		#OK, the SkipFile exists.
+		logme ('SkipFile is "{0}"' -f $Filename) $true
+		$SkipFileEntries = import-csv $Filename
+		#Check if SkipFile file is empty:
+		if ($SkipFileEntries -ne $null)
+		{
+			#OK, it's not empty. (It has at least headers).
+			#Let's check it has the RIGHT headers:
+			$FileValid = 0
+			foreach ($columnTitle in $SkipFileEntries[0].psobject.properties.name)
+			{
+				if (@('Name','TitleBar') -contains $columnTitle) { $fileValid ++ }
+			}
+			if ($fileValid -eq 2)
+			{
+				#It has the expected headers. Now check for at least one entry:
+				$count = $SkipFileEntries | Measure-Object | Select-Object -expand count
+				if ($count -eq 0)
+				{
+					logme "SkipFile contains nothing to skip!" $true
+				}
+				else
+				{
+					#So far so good. Now is the RegEx valid?
+					if ($ValidateSkipfile.IsPresent) # (We don't bother with this step otherwise. The script will skip over bad RegEx when it executes)
+					{
+						$SkipFileEntryId = 1
+						foreach ($SkipFileEntry in $SkipFileEntries)
+						{
+							if (ValidateRegex $SkipFileEntry.Name)
+							{
+								logme ("Entry #{0} Name     is valid: {1}" -f $SkipFileEntryId, ($SkipFileEntry.Name).PadRight(1,"-")) $true
+							}
+							else
+							{
+								logme ("Entry #{0} Name     is bad: {1}" -f $SkipFileEntryId, $RegexError) $true
+							}
+							if (ValidateRegex $SkipFileEntry.TitleBar)
+							{
+								logme ("Entry #{0} TitleBar is valid: {1}" -f $SkipFileEntryId, ($SkipFileEntry.TitleBar).PadRight(1,"-")) $true
+							}
+							else
+							{
+								logme ("Entry #{0} TitleBar is bad: {1}" -f $SkipFileEntryId, $RegexError) $true
+							}
+							$SkipFileEntryId ++
+						}
+					}
+				}
+			}
+			else
+			{
+				#Bad headers. Null the content and drop an error:
+				$SkipFileEntries = $null
+				logme "Skipfile doesn't contain the required headers." $true
+			}
+		}
+		else
+		{
+			logme "SkipFile is empty" $true
+		}
+	}
+	else
+	{
+		logme ('SkipFile "{0}" does not exist.' -f $Filename) $true
+	}
+	
+	return $SkipFileEntries
+}
+
+
+function ValidateRegex
+{
+	param ([string]$regex)
+
+	if ([string]::IsNullOrEmpty($regex)) { return $true }
+	try
+	{
+		("" -match $regex)
+		return $true
+	}
+	catch
+	{
+		$Global:RegexError = $_.Exception.Message
+		return $false
+	}
+}
+
+
 function logme
 {
-	param ([string]$message, [bool]$display)
+	param ([string]$message, [bool]$display = $false)
 
 	if ($debug)
 	{
@@ -181,9 +295,17 @@ function logme
 	}
 	if ($display)
 	{
-		write-output $message
+		#The need for 'write-information' is because ValidateFile returns a value, and as such it would have prevented write-output from working in the nested calls to logme.
+		if ($PSVersionTable.PSVersion.Major -ge 5)
+		{
+			Write-Information -MessageData $message -InformationAction continue
+		}
+		else
+		{
+			# SURELY no-one's running anything lower than v5?
+			write-host $message
+		}
 	}
-	
 }
 
 #--------------------------------
@@ -217,27 +339,25 @@ if ($GetArsoKey.IsPresent -or $PSBoundParameters.ContainsKey("SetArsoKey"))
 		# Set the key:
 		WriteRegistry $ArsoKeyPath "DisableAutomaticRestartSignOn" "DWORD" $SetArsoKey
 	}
+	logme 'Exited after Registry interaction.'
 	exit
 }
 
 
 if ($SkipFile)
 {
-	#If the user only provided a filename, add the script's path for an absolute reference:
-	if ([IO.Path]::IsPathRooted($SkipFile))
-	{
-		#It's absolute. Safe to leave.
-	}
-	else
-	{
-		#It's relative.
-		$SkipFile = [IO.Path]::GetFullPath((Join-Path -path $dir -childpath $SkipFile))
-	}
-	logme ('$SkipFile is     "{0}"' -f $SkipFile)
+	$SkipFileEntries = validateSkipFile $SkipFile
 }
 else
 {
 	logme 'No $SkipFile provided.'
+	$SkipFileEntries = $null
+}
+
+if ($ValidateSkipFile.IsPresent)
+{
+	logme 'Exited after validating SkipFile.'
+	exit
 }
 
 
@@ -265,29 +385,37 @@ else
 	}
 }
 
-
-
 $params = $params.trim()
-write-host ("Params >" + $params + "<") # DEBUG LINES. Remove before release!!
-write-host ""
-
-logme ('Params   = "{0}"' -f $params)
+logme ('Params = "{0}"' -f $params) $false
 
 # Prep ends here. Now the real meat begins!
 
+
 $shutdown = $true
 
-$processes = get-process
-
-foreach ($process in $processes)
+:outer foreach ($process in get-process)
 {
-	if ($skiplist -contains $process.name)
+	if ($skiplist -contains $process.Name)
 	{
 		$shutdown = $false
 		logme "Shutdown aborted: $($process.name) is running" $true
 		break
 	}
-	
+	$SkipFileEntryId = 1
+	foreach ($SkipFileEntry in $SkipFileEntries)
+	{
+		if ((ValidateRegex $SkipFileEntry.Name) -and (ValidateRegex $SkipFileEntry.TitleBar))
+		{
+			if (($Process.Name -match $SkipFileEntry.Name)`
+				-and ($Process.mainWindowTitle -match $SkipFileEntry.TitleBar))
+			{
+				$shutdown = $false
+				logme ("Shutdown aborted: {0} / {1} matches SkipFile entry #{2}" -f ($process.name).PadRight(1,"-"), ($Process.mainWindowTitle).PadRight(1,"-"), $SkipFileEntryId) $true
+				break outer
+			}
+		}
+		$SkipFileEntryId ++
+	}
 }
 
 if ($shutdown)
@@ -324,7 +452,9 @@ if ($shutdown)
 logme 'Exited cleanly.'
 
 # CREDITS/REFERENCES:
-# 'Shutdown': https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/shutdown
+# Get-Process (including Window titles): https://devblogs.microsoft.com/scripting/powertip-display-titles-of-windows/
+# Shutdown: https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/shutdown
 # ARSO: https://learn.microsoft.com/en-us/windows-server/security/windows-authentication/winlogon-automatic-restart-sign-on-arso
 # ARSO: https://www.elevenforum.com/t/enable-or-disable-auto-sign-in-and-lock-after-update-or-restart-in-windows-11.3324/
 # Test for hibernate: https://stackoverflow.com/questions/41639739/get-hibernate-status
+# The registry writes: https://github.com/greiginsydney/Set-SfBClientWarnings.ps1/blob/master/Set-SfBClientWarnings.ps1
