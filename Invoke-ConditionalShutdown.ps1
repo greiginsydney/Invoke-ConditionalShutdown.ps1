@@ -177,7 +177,7 @@ function WriteRegistry
 		else
 		{
 			$result = "Registry error caught by handler: $_"
-			logme $result $true
+			logme $result $true $true
 		}
 	}
 }
