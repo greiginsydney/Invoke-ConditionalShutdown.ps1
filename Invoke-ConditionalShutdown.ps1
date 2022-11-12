@@ -17,7 +17,7 @@
 	Based on : <null>
 	Blog post: https://greiginsydney.com/Invoke-ConditionalShutdown.ps1
 
-	WISH-LIST / TODO:
+	WISH-LIST / TODO:	Add the ability to skip a shutdown if there's a remote user session open/disconnected, or other users logged in.
 
 	KNOWN ISSUES:
 
