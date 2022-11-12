@@ -429,23 +429,7 @@ $shutdown = $true
 
 if ($shutdown)
 {
-	if (!$TestMode)
-	{
-		try
-		{
-			$response = Invoke-Expression "& shutdown $params"
-			if (! [string]::IsNullOrEmpty($response))
-			{
-				logme "Response = $response" $true
-			}
-		}
-		catch
-		{
-			$result = "Error caught by handler:`n$_"
-			logme $result $true
-		}
-	}
-	else
+	if ($TestMode.IsPresent)
 	{
 		if ($Hibernate.IsPresent)
 		{
@@ -454,6 +438,33 @@ if ($shutdown)
 		else
 		{
 			logme "TestMode skipped what would have otherwise been a shutdown" $true
+		}
+	}
+	else
+	{
+		try
+		{
+			$response = Invoke-Expression "& shutdown $params"
+			if ([string]::IsNullOrEmpty($response))
+			{
+				if ($Hibernate.IsPresent)
+				{
+					logme "Hibernate invoked" $true $true
+				}
+				else
+				{
+					logme "Shutdown invoked" $true $true
+				}
+			}
+			else
+			{
+				logme "Response = $response" $true $true
+			}
+		}
+		catch
+		{
+			$result = "Error caught by handler:`n$_"
+			logme $result $true
 		}
 	}
 }
