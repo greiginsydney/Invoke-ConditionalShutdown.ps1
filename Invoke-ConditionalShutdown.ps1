@@ -203,7 +203,7 @@ function ValidateSkipFile
 	if (test-path $Filename)
 	{
 		#OK, the SkipFile exists.
-		logme ('SkipFile is "{0}"' -f $Filename) $true $true
+		logme ('SkipFile is "{0}"' -f $Filename) $false $true
 		$SkipFileEntries = import-csv $Filename
 		#Check if SkipFile file is empty:
 		if ($SkipFileEntries -ne $null)
