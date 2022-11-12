@@ -44,6 +44,10 @@ Test your settings are correct without risking an unexpected shutdown/hibernate 
 
 Add the -debug switch to create a verbose log file. (The script will still log some events to the file anyway.)
 
+### Code Signed
+
+With thanks to DigiCert, the released version of the script has been signed, so it'll run in environments where a strict security policy is enforced.
+
 <hr>
 
 [My blog](https://greiginsydney.com/invoke-conditionalshutdown-ps1) has the full documentation, including setup and troubleshooting steps.
