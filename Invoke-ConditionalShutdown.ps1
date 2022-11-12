@@ -225,7 +225,10 @@ function ValidateSkipFile
 				}
 				else
 				{
-					#So far so good. Now is the RegEx valid?
+					#So far so good.
+					#Fix crazy edge case: if the LAST TitleBar in the file is blank, it's read as a null and breaks the display below:
+					$SkipFileEntries = ($SkipFileEntries | Select Name,@{N = 'TitleBar'; E = {if([string]::IsNullOrEmpty($_.TitleBar)) { "" } else { $_.TitleBar }}})
+					#Now is the RegEx valid?
 					if ($ValidateSkipfile.IsPresent) # (We don't bother with this step otherwise. The script will skip over bad RegEx when it executes)
 					{
 						$SkipFileEntryId = 1
@@ -465,3 +468,6 @@ logme 'Exited cleanly.'
 # ARSO: https://www.elevenforum.com/t/enable-or-disable-auto-sign-in-and-lock-after-update-or-restart-in-windows-11.3324/
 # Test for hibernate: https://stackoverflow.com/questions/41639739/get-hibernate-status
 # The registry writes: https://github.com/greiginsydney/Set-SfBClientWarnings.ps1/blob/master/Set-SfBClientWarnings.ps1
+
+# Crazy Edge case: https://github.com/PowerShell/PowerShell/issues/17702
+# Fix for above: https://stackoverflow.com/questions/66495269/how-to-replace-a-null-or-empty-value-in-powershell
