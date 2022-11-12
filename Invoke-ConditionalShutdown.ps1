@@ -49,7 +49,14 @@
 	Description
 	-----------
 	This initiates a system shutdown if none of the tests in the "ShutdownSkipFile.csv" file pass. See documentation for the required file format.
-	(It's basically "exe name", "title bar text", but with RegEx to complicate matters).
+	(It's basically "process name", "title bar text", but with RegEx to complicate matters).
+
+.EXAMPLE
+	.\Invoke-ConditionalShutdown.ps1 -SkipFile "ShutdownSkipFile.csv" -ValidateSkipFile
+
+	Description
+	-----------
+	This validates the RegEx in your SkipFile without shutting down the system.
 
 .EXAMPLE
 	.\Invoke-ConditionalShutdown.ps1 -SetArsoKey
@@ -63,8 +70,7 @@
 
 	Description
 	-----------
-	"-TestMode" is used when setting up the script. It validates your SkipList and SkipFile as appropriate, and does not shut down or hibernate the machine.
-	If the machine would / would not shutdown or hiberate is output to the screen and log file.
+	"-TestMode" is used when setting up the script. If the machine would / would not shutdown or hiberate is output to the screen and log file.
 
 
 .PARAMETER SkipList
@@ -197,7 +203,7 @@ function ValidateSkipFile
 	if (test-path $Filename)
 	{
 		#OK, the SkipFile exists.
-		logme ('SkipFile is "{0}"' -f $Filename) $true
+		logme ('SkipFile is "{0}"' -f $Filename) $true $true
 		$SkipFileEntries = import-csv $Filename
 		#Check if SkipFile file is empty:
 		if ($SkipFileEntries -ne $null)
@@ -215,7 +221,7 @@ function ValidateSkipFile
 				$count = $SkipFileEntries | Measure-Object | Select-Object -expand count
 				if ($count -eq 0)
 				{
-					logme "SkipFile contains nothing to skip!" $true
+					logme "SkipFile contains nothing to skip!" $true $true
 				}
 				else
 				{
@@ -227,19 +233,19 @@ function ValidateSkipFile
 						{
 							if (ValidateRegex $SkipFileEntry.Name)
 							{
-								logme ("Entry #{0} Name     is valid: {1}" -f $SkipFileEntryId, ($SkipFileEntry.Name).PadRight(1,"-")) $true
+								logme ("Entry #{0} Name     is valid: {1}" -f $SkipFileEntryId, ($SkipFileEntry.Name).PadRight(1,"-")) $true $true
 							}
 							else
 							{
-								logme ("Entry #{0} Name     is bad: {1}" -f $SkipFileEntryId, $RegexError) $true
+								logme ("Entry #{0} Name     is bad  : {1}" -f $SkipFileEntryId, $RegexError) $true $true
 							}
 							if (ValidateRegex $SkipFileEntry.TitleBar)
 							{
-								logme ("Entry #{0} TitleBar is valid: {1}" -f $SkipFileEntryId, ($SkipFileEntry.TitleBar).PadRight(1,"-")) $true
+								logme ("Entry #{0} TitleBar is valid: {1}" -f $SkipFileEntryId, ($SkipFileEntry.TitleBar).PadRight(1,"-")) $true $true
 							}
 							else
 							{
-								logme ("Entry #{0} TitleBar is bad: {1}" -f $SkipFileEntryId, $RegexError) $true
+								logme ("Entry #{0} TitleBar is bad  : {1}" -f $SkipFileEntryId, $RegexError) $true $true
 							}
 							$SkipFileEntryId ++
 						}
@@ -250,17 +256,17 @@ function ValidateSkipFile
 			{
 				#Bad headers. Null the content and drop an error:
 				$SkipFileEntries = $null
-				logme "Skipfile doesn't contain the required headers." $true
+				logme "Skipfile doesn't contain the required headers." $true $true
 			}
 		}
 		else
 		{
-			logme "SkipFile is empty" $true
+			logme "SkipFile is empty" $true $true
 		}
 	}
 	else
 	{
-		logme ('SkipFile "{0}" does not exist.' -f $Filename) $true
+		logme ('SkipFile "{0}" does not exist.' -f $Filename) $true $true
 	}
 	
 	return $SkipFileEntries
@@ -287,9 +293,9 @@ function ValidateRegex
 
 function logme
 {
-	param ([string]$message, [bool]$display = $false)
+	param ([string]$message, [bool]$display = $false, [bool]$ForceLog = $false)
 
-	if ($debug)
+	if ($debug -or $ForceLog)
 	{
 		add-content -path $LogFile -value ('{0:MMMdd-HHmm} {1}' -f (get-date), $message) -force
 	}
@@ -398,7 +404,7 @@ $shutdown = $true
 	if ($skiplist -contains $process.Name)
 	{
 		$shutdown = $false
-		logme "Shutdown aborted: $($process.name) is running" $true
+		logme "Shutdown aborted: $($process.name) is running" $true $true
 		break
 	}
 	$SkipFileEntryId = 1
@@ -410,7 +416,7 @@ $shutdown = $true
 				-and ($Process.mainWindowTitle -match $SkipFileEntry.TitleBar))
 			{
 				$shutdown = $false
-				logme ("Shutdown aborted: {0} / {1} matches SkipFile entry #{2}" -f ($process.name).PadRight(1,"-"), ($Process.mainWindowTitle).PadRight(1,"-"), $SkipFileEntryId) $true
+				logme ("Shutdown aborted: {0} / {1} matches SkipFile entry #{2}" -f ($process.name).PadRight(1,"-"), ($Process.mainWindowTitle).PadRight(1,"-"), $SkipFileEntryId) $true $true
 				break outer
 			}
 		}
@@ -453,6 +459,7 @@ logme 'Exited cleanly.'
 
 # CREDITS/REFERENCES:
 # Get-Process (including Window titles): https://devblogs.microsoft.com/scripting/powertip-display-titles-of-windows/
+# 											Get-Process | Where { $_.MainWindowTitle} |Select-Object ProcessName, MainWindowTitle
 # Shutdown: https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/shutdown
 # ARSO: https://learn.microsoft.com/en-us/windows-server/security/windows-authentication/winlogon-automatic-restart-sign-on-arso
 # ARSO: https://www.elevenforum.com/t/enable-or-disable-auto-sign-in-and-lock-after-update-or-restart-in-windows-11.3324/
