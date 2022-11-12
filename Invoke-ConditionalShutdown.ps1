@@ -383,7 +383,7 @@ if ($Hibernate.IsPresent)
 }
 else
 {
-	$params += "-t $($time) -d P:0:0 -c 'Shutdown by script Invoke-ConditionalShutdown'"
+	$params += "-t $($time) -d P:0:0 -c 'Shutdown by script Invoke-ConditionalShutdown' "
 	if ($Reopen.Ispresent)
 	{
 		$params += '-sg '
