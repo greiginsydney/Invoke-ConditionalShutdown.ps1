@@ -38,7 +38,7 @@
 
 	Description
 	-----------
-	This initiates a system shutdown. It is no different to the "shutdown -t 10" command.
+	Displays the script's examples. If you're running the script with no attributes you're doing it wrong.
 
 .EXAMPLE
 	.\Invoke-ConditionalShutdown.ps1 -SkipList "Notepad++,Winword"
@@ -53,7 +53,7 @@
 	Description
 	-----------
 	This initiates a system shutdown if none of the tests in the "ShutdownSkipFile.csv" file pass. See documentation for the required file format.
-	(It's basically "process name", "title bar text", but with RegEx to complicate matters).
+	(It's basically "process name"<comma>"title bar text" but with RegEx to complicate matters).
 
 .EXAMPLE
 	.\Invoke-ConditionalShutdown.ps1 -SkipFile "ShutdownSkipFile.csv" -ValidateSkipFile
@@ -141,10 +141,10 @@ $Global:Debug = $psboundparameters.debug.ispresent
 
 $ArsoKeyPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System"
 
-
 #--------------------------------
 # END CONSTANTS -----------------
 #--------------------------------
+
 
 #--------------------------------
 # START FUNCTIONS ---------------
@@ -326,12 +326,28 @@ function logme
 #--------------------------------
 
 
-$scriptpath = $MyInvocation.MyCommand.Path
-$dir = Split-Path -Path $scriptpath
+$ScriptPath = $MyInvocation.MyCommand.Path
+$ScriptName = $MyInvocation.MyCommand.Name
+$dir = Split-Path -Path $ScriptPath
 $Global:LogFile = (Join-Path -path $dir -childpath (("Invoke-ConditionalShutdown-{0:yyyyMMM}.log") -f (Get-Date)))
 
-logme ''
-logme 'Launched'
+
+[string]$ParamList = ""
+foreach($boundparam in $PSBoundParameters.GetEnumerator())
+{
+	[string]$ParamList += "{0}={1} " -f $boundparam.Key,$boundparam.Value
+}
+$ParamList = $ParamList.trim()
+
+if ([string]::IsNullOrEmpty($ParamList))
+{
+	get-help .\$($ScriptName) -examples
+	exit
+}
+
+
+logme '' $false $true
+logme ('Launched with: {0}' -f $ParamList.PadRight(1,"-")) $false $true
 
 
 if ($GetArsoKey.IsPresent -or $PSBoundParameters.ContainsKey("SetArsoKey"))
@@ -408,12 +424,14 @@ $shutdown = $true
 
 :outer foreach ($process in get-process)
 {
-	if ($skiplist -contains $process.Name)
+	$SkipListArray = ($SkipList).Split(',')
+	if ($SkipListArray -contains $process.Name)
 	{
 		$shutdown = $false
 		logme "Shutdown aborted: $($process.name) is running" $true $true
 		break
 	}
+
 	$SkipFileEntryId = 1
 	foreach ($SkipFileEntry in $SkipFileEntries)
 	{
@@ -473,7 +491,7 @@ if ($shutdown)
 	}
 }
 
-logme 'Exited cleanly.'
+logme 'Exited cleanly.' $false $true
 
 # CREDITS/REFERENCES:
 # Get-Process (including Window titles): https://devblogs.microsoft.com/scripting/powertip-display-titles-of-windows/
