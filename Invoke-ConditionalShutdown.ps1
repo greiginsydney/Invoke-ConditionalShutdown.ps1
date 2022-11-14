@@ -1,16 +1,21 @@
 <#
 .SYNOPSIS
-	This script shuts down or hibernates this machine if one or more exceptions are NOT met.
+	This script shuts down or hibernates this machine provided NONE of the listed exceptions are met.
 
 .DESCRIPTION
-	This script shuts down or hibernates this machine if one or more executables are running,
-	or if specified text is NOT present in the title bar of a given app.
-	
-	
+	This script shuts down or hibernates this machine provided NONE of the listed exceptions are met.
+	The listed exceptions can be a comma-separated list of process names, or a CSV file containing process names
+	 and matching title bar text. The CSV file values are all interpreted as Regular Expressions, allowing a
+	 more granular level of control.
+
+	Command-line switches also allow the user to query, set and clear the Registry Key for the
+	 "automatic restart sign on" (ARSO) feature (subject to Windows permissions of course).
+
+
 
 .NOTES
-	Version				: 0.0
-	Date				: 1st November 2022
+	Version				: 1.0
+	Date				: 15th November 2022
 	Author				: Greig Sheridan
 	See the credits at the bottom of the script
 
@@ -22,10 +27,9 @@
 	KNOWN ISSUES:
 
 	Revision History 	:
-				v0.0 1st November 2022
+				v1.0 15th November 2022
 					Initial release
-				
-					
+
 .LINK
 	https://greiginsydney.com/Invoke-ConditionalShutdown.ps1 - also https://github.com/greiginsydney/Invoke-ConditionalShutdown.ps1
 
@@ -84,16 +88,16 @@
 
 .PARAMETER Hibernate
 	Switch. If present, the script will hibernate the machine instead of shutting it down.
-	
+
 .PARAMETER Reopen
 	Switch. If present, Windows will re-launch any open apps on the next boot.
-	
+
 .PARAMETER GetArsoKey
 	Switch. Queries the current state of the ARSO registry key.
-	
+
 .PARAMETER SetArsoKey
 	Switch. Sets the ARSO registry key to 0 or 1. A value of 0 is required for "-reopen" to operate correctly.
-	
+
 .PARAMETER TestMode
 	Switch. If present, the script will NOT shutdown or hibernate the machine. It's essentially a "whatif".
 
@@ -271,7 +275,7 @@ function ValidateSkipFile
 	{
 		logme ('SkipFile "{0}" does not exist.' -f $Filename) $true $true
 	}
-	
+
 	return $SkipFileEntries
 }
 
@@ -340,7 +344,7 @@ if ($GetArsoKey.IsPresent -or $PSBoundParameters.ContainsKey("SetArsoKey"))
 			0       { logme 'Registry key value is 0. AutomaticRestartSignOn is ENABLED.' $true }
 			1       { logme 'Registry key value is 1. AutomaticRestartSignOn is DISABLED.' $true }
 			default { logme 'Registry key not found.' $true }
-			
+
 		}
 	}
 	else
