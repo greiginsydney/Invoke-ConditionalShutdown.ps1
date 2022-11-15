@@ -32,7 +32,7 @@ Windows’ shutdown command has a “-t nn” attribute, and I’ve catered for 
 
 If enabled and invoked, when the machine next boots, all the previously-running apps will reopen. See “ARSO” in the blog post linked below.
 
-### Validate the regex in the SkipFile
+### Validate the RegEx in the SkipFile
 
 Not sure if your RegEx is up to scratch? Don’t worry, neither is mine. Run the script with the “-ValidateSkipFile” switch and it will tell you which of your RegEx rules are no good. Rinse and repeat until it’s all valid, then proceed to “TestMode”.
 
