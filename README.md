@@ -40,9 +40,9 @@ Not sure if your RegEx is up to scratch? Don’t worry, neither is mine. Run the
 
 Test your settings are correct without risking an unexpected shutdown/hibernate event. The script will drop a message to the screen telling you if it would have shutdown or not, and what criteria triggered the ‘skip’. (Run -ValidateSkipFile first if you’re using the SkipFile).
 
-### Debug
+### Verbose
 
-Add the -debug switch to create a verbose log file. (The script will still log some events to the file anyway.)
+Add the -verbose switch to show all output on screen.
 
 ### Code Signed
 
