@@ -11,6 +11,8 @@
 	Command-line switches also allow the user to query, set and clear the Registry Key for the
 	 "automatic restart sign on" (ARSO) feature (subject to Windows permissions of course).
 
+	A log file is created that captures each time the script runs. To see this info on-screen add the '-verbose' switch.
+
 
 
 .NOTES
@@ -38,7 +40,7 @@
 
 	Description
 	-----------
-	Displays the script's examples. If you're running the script with no attributes you're doing it wrong.
+	Displays the script's examples. If you're running the script with no parameters you're doing it wrong.
 
 .EXAMPLE
 	.\Invoke-ConditionalShutdown.ps1 -SkipList "Notepad++,Winword"
@@ -100,10 +102,6 @@
 
 .PARAMETER TestMode
 	Switch. If present, the script will NOT shutdown or hibernate the machine. It's essentially a "whatif".
-
-.PARAMETER Debug
-	Switch. If present, the script will drop a detailed debug log file into its own folder. One per month.
-
 #>
 
 [CmdletBinding(SupportsShouldProcess = $False, DefaultParameterSetName='None')]
@@ -132,7 +130,6 @@ param(
 )
 
 $Error.Clear()		#Clear PowerShell's error variable
-$Global:Debug = $psboundparameters.debug.ispresent
 
 
 #--------------------------------
@@ -140,6 +137,7 @@ $Global:Debug = $psboundparameters.debug.ispresent
 #--------------------------------
 
 $ArsoKeyPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System"
+$Global:Verbose = $psboundparameters.verbose.ispresent
 
 #--------------------------------
 # END CONSTANTS -----------------
@@ -300,23 +298,21 @@ function ValidateRegex
 
 function logme
 {
-	param ([string]$message, [bool]$display = $false, [bool]$ForceLog = $false)
+	param ([string]$Message, [bool]$Display = $false)
 
-	if ($debug -or $ForceLog)
-	{
-		add-content -path $LogFile -value ('{0:MMMdd-HHmm} {1}' -f (get-date), $message) -force
-	}
-	if ($display)
+	add-content -path $LogFile -value ('{0:MMMdd-HHmm} {1}' -f (get-date), $Message) -force
+
+	if ($Display -or $Verbose)
 	{
 		#The need for 'write-information' is because ValidateFile returns a value, and as such it would have prevented write-output from working in the nested calls to logme.
 		if ($PSVersionTable.PSVersion.Major -ge 5)
 		{
-			Write-Information -MessageData $message -InformationAction continue
+			Write-Information -MessageData $Message -InformationAction continue
 		}
 		else
 		{
 			# SURELY no-one's running anything lower than v5?
-			write-host $message
+			write-host $Message
 		}
 	}
 }
@@ -346,8 +342,8 @@ if ([string]::IsNullOrEmpty($ParamList))
 }
 
 
-logme '' $false $true
-logme ('Launched with: {0}' -f $ParamList.PadRight(1,"-")) $false $true
+logme '' $false
+logme ('Launched with: {0}' -f $ParamList.PadRight(1,"-")) $false
 
 
 if ($GetArsoKey.IsPresent -or $PSBoundParameters.ContainsKey("SetArsoKey"))
@@ -368,7 +364,7 @@ if ($GetArsoKey.IsPresent -or $PSBoundParameters.ContainsKey("SetArsoKey"))
 		# Set the key:
 		WriteRegistry $ArsoKeyPath "DisableAutomaticRestartSignOn" "DWORD" $SetArsoKey
 	}
-	logme 'Exited after Registry interaction.'
+	logme 'Exited after Registry interaction.' $false
 	exit
 }
 
@@ -379,13 +375,13 @@ if ($SkipFile)
 }
 else
 {
-	logme 'No $SkipFile provided.'
+	logme 'No $SkipFile provided.' $false
 	$SkipFileEntries = $null
 }
 
 if ($ValidateSkipFile.IsPresent)
 {
-	logme 'Exited after validating SkipFile.'
+	logme 'Exited after validating SkipFile.' $false
 	exit
 }
 
@@ -396,7 +392,7 @@ if ($Hibernate.IsPresent)
 {
 	if (!((Get-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Control\Power -name HibernateEnabled -erroraction silentlycontinue).HibernateEnabled -eq 1))
 	{
-		logme ('Hibernate aborted: Hibernate is not enabled.') $true
+		logme 'Hibernate aborted: Hibernate is not enabled.' $true
 		exit
 	}
 	$params += '-h'	# Hybernate doesn't want ANY more parameters!
@@ -428,7 +424,7 @@ $shutdown = $true
 	if ($SkipListArray -contains $process.Name)
 	{
 		$shutdown = $false
-		logme "Shutdown aborted: $($process.name) is running" $true $true
+		logme "Shutdown aborted: $($process.name) is running" $true
 		break
 	}
 
@@ -441,7 +437,7 @@ $shutdown = $true
 				-and ($Process.mainWindowTitle -match $SkipFileEntry.TitleBar))
 			{
 				$shutdown = $false
-				logme ("Shutdown aborted: {0} / {1} matches SkipFile entry #{2}" -f ($process.name).PadRight(1,"-"), ($Process.mainWindowTitle).PadRight(1,"-"), $SkipFileEntryId) $true $true
+				logme ("Shutdown aborted: {0} / {1} matches SkipFile entry #{2}" -f ($process.name).PadRight(1,"-"), ($Process.mainWindowTitle).PadRight(1,"-"), $SkipFileEntryId) $true
 				break outer
 			}
 		}
@@ -471,16 +467,16 @@ if ($shutdown)
 			{
 				if ($Hibernate.IsPresent)
 				{
-					logme "Hibernate invoked" $true $true
+					logme "Hibernate invoked" $true
 				}
 				else
 				{
-					logme "Shutdown invoked" $true $true
+					logme "Shutdown invoked" $true
 				}
 			}
 			else
 			{
-				logme "Response = $response" $true $true
+				logme "Response = $response" $false $true
 			}
 		}
 		catch
@@ -491,7 +487,7 @@ if ($shutdown)
 	}
 }
 
-logme 'Exited cleanly.' $false $true
+logme 'Exited cleanly.' $false
 
 # CREDITS/REFERENCES:
 # Get-Process (including Window titles): https://devblogs.microsoft.com/scripting/powertip-display-titles-of-windows/
